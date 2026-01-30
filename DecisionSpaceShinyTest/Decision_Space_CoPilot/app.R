@@ -1,0 +1,140 @@
+library(shiny)
+library(tidyverse)
+
+ui <- fluidPage(
+  titlePanel("Extinction Risk Visualization"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("tab", "Select View:",
+                  choices = c("Overview","1. Framework", "2. Risk Threshold", "3. Time Threshold", "4. Policy Thresholds")),
+      
+      # Show Risk Threshold slider only when relevant
+      conditionalPanel(
+        condition = "input.tab == '2. Risk Threshold' || input.tab == '4. Policy Thresholds'",
+        sliderInput("risk", "Risk Threshold:", min = 0, max = 100, value = 25, step = 5)
+      ),
+      
+      # Show Time Threshold slider only when relevant
+      conditionalPanel(
+        condition = "input.tab == '3. Time Threshold' || input.tab == '4. Policy Thresholds'",
+        sliderInput("time", "Time Threshold:", min = 0, max = 100, value = 20, step = 5)
+      )
+    ),
+    mainPanel(
+      conditionalPanel(
+        condition = "input.tab != 'Overview'",
+        plotOutput("mainPlot", height = "600px")
+      ),
+      textOutput("plotDescription")
+    )
+  )
+)
+
+server <- function(input, output) {
+  time <- seq.int(0, 100, 10)
+  
+  output$mainPlot <- renderPlot({
+    Risk_Threshold <- rep(if (!is.null(input$risk)) input$risk else 25, length(time))
+    Time_Threshold <- if (!is.null(input$time)) input$time else 20
+    
+    if (input$tab == "Overview") {
+      
+    } else if (input$tab == "1. Framework") {
+      cP_Read_Me <- seq.int(0, 100, 10)
+      data_Read_Me <- tibble(time, cP_Read_Me)
+      
+      ggplot(data_Read_Me, aes(time, cP_Read_Me)) +
+        labs(x = 'Time', y = 'Cumulative Probability of Extinction') +
+        scale_x_continuous(labels = c("Present", "Future"), breaks = c(0, 100), expand = c(0, 0)) +
+        scale_y_continuous(breaks = seq.int(0, 100, 10), expand = c(0, 0)) +
+        coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(hjust = c(0, 1), vjust = 0.2),
+              text = element_text(size = 20))
+      
+    } else if (input$tab == "2. Risk Threshold") {
+      cP_Warranted <- seq.int(0, 100, 10)
+      data_Warranted <- tibble(time, cP_Warranted, Risk_Threshold)
+      
+      ggplot(data_Warranted, aes(time, Risk_Threshold)) +
+        geom_ribbon(aes(ymin = Risk_Threshold, ymax = Risk_Threshold + 100), fill = "red", alpha = 0.25) +
+        geom_ribbon(aes(ymin = Risk_Threshold - 100, ymax = Risk_Threshold), fill = "green", alpha = 0.25) +
+        geom_line(color = "red") +
+        annotate("label", x = 50, y = mean(c(100, mean(Risk_Threshold))), label = "warranted", color = "red", size = 6) +
+        annotate("label", x = 50, y = mean(c(0, mean(Risk_Threshold))), label = "not warranted", color = "green", size = 6) +
+        labs(x = 'Time', y = 'Cumulative Probability of Extinction') +
+        scale_x_continuous(labels = c("Present", "Future"), breaks = c(0, 100), expand = c(0, 0)) +
+        scale_y_continuous(breaks = seq.int(0, 100, 10), expand = c(0, 0)) +
+        coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(hjust = c(0, 1), vjust = 0.2),
+              text = element_text(size = 20))
+      
+    } else if (input$tab == "3. Time Threshold") {
+      cP_Time <- seq.int(0, 100, 10)
+      data_Time <- tibble(time, cP_Time, Time_Threshold)
+      
+      ggplot(data_Time) +
+        geom_rect(aes(xmin = 0, xmax = Time_Threshold, ymin = 0, ymax = 100), fill = "orange", alpha = 0.075) +
+        geom_rect(aes(xmin = Time_Threshold, xmax = 100, ymin = 0, ymax = 100), fill = "khaki1", alpha = 0.075) +
+        geom_vline(xintercept = Time_Threshold) +
+        annotate("label", x = Time_Threshold / 2, y = 50, label = "endangered", size = 6) +
+        annotate("label", x = Time_Threshold + (100 - Time_Threshold) / 2, y = 50, label = "threatened", size = 6) +
+        labs(x = 'Time', y = 'Cumulative Probability of Extinction') +
+        scale_x_continuous(labels = c("Present", "Future"), breaks = c(0, 100), expand = c(0, 0)) +
+        scale_y_continuous(breaks = seq.int(0, 100, 10), expand = c(0, 0)) +
+        coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(hjust = c(0, 1), vjust = 0.2),
+              text = element_text(size = 20))
+      
+    } else if (input$tab == "4. Policy Thresholds") {
+      cP_Time <- seq.int(0, 100, 10)
+      data_Policy <- tibble(time, cP_Time, Time_Threshold, Risk_Threshold)
+      
+      ggplot(data_Policy) +
+        geom_rect(aes(xmin = 0, xmax = Time_Threshold, ymin = 0, ymax = 100), fill = "orange", alpha = 0.075) +
+        geom_rect(aes(xmin = Time_Threshold, xmax = 100, ymin = 0, ymax = 100), fill = "khaki1", alpha = 0.075) +
+        geom_ribbon(aes(ymin = Risk_Threshold, ymax = Risk_Threshold + 100, x = time), fill = "red", alpha = 0.25) +
+        geom_ribbon(aes(ymin = Risk_Threshold - 100, ymax = Risk_Threshold, x = time), fill = "green", alpha = 0.25) +
+        geom_vline(xintercept = Time_Threshold) +
+        geom_hline(aes(yintercept = Risk_Threshold), color = "red") +
+        annotate("label", x = Time_Threshold / 2, y = 50, label = "endangered", size = 6) +
+        annotate("label", x = Time_Threshold + (100 - Time_Threshold) / 2, y = 50, label = "threatened", size = 6) +
+        annotate("label", x = Time_Threshold / 2, y = mean(c(0, mean(Risk_Threshold))), label = "not warranted", color = "green", size = 6) +
+        annotate("label", x = Time_Threshold + (100 - Time_Threshold) / 2, y = mean(c(0, mean(Risk_Threshold))),
+                 label = "not warranted", color = "green", size = 6) +
+        labs(x = 'Time', y = 'Cumulative Probability of Extinction') +
+        scale_x_continuous(labels = c("Present", "Future"), breaks = c(0, 100), expand = c(0, 0)) +
+        scale_y_continuous(breaks = seq.int(0, 100, 10), expand = c(0, 0)) +
+        coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
+        theme_bw() +
+        theme(axis.text.x = element_text(hjust = c(0, 1), vjust = 0.2),
+              text = element_text(size = 20))
+    }
+  })
+  
+  output$plotDescription <- renderText({
+    switch(input$tab,
+           "Overview" ="This application provides visual tools to explore extinction risk over time. Use the tabs and adjust thresholds in the conceptual models to see how different components of relate to and influence a hypothetical Endangered Species Act (ESA) classification. Componets that can be adjusted include the information (e.g., science) and values (e.g., policy) inputs to an ESA classification. Start by exploring the first figure, '1. Framework'. 
+           
+           Risk Figure Description
+Risk is defined by a) the consequences (e.g., magnitude, severity, impact) of an event, and b) the probability (e.g., likelihood, odds, chance of) of an event. For the ESA the consequence of the risk being managed is defined as a species being 'in danger of extinction'.
+
+Conservation biology tells us tools like population viability analysis that provide probability of extinction is the means to assess probability for species risk management. For ESA implementation this probability is assessed via a species status assessment (SSA). Determining this probability depends upon when in the future the probability of extinction is being assessed, i.e., the time of the assessment. Therefore, the relevant dimensions of a figure exploring the relationship between risk and ESA classification decisions are the time (the horizontal or x axis) and the probability (the vertical or y axis) of extinction. (See Tab 2. Species risk curves)
+
+With the scientific assessment of available information from an SSA in hand the policy task is then to determine if the assessed risk meets a policy based risk tolerance level. (See Tab 3. Risk Tolerance)",
+           "1. Framework" = "This plot shows the basic framework of extinction risk over time. The axes shown here are present in all of the plots that follow. shown here only with the axes labeled and no other information presented. After reviewing the visualization framework here (Tab 1. Read Me) advance to Tab 2 (2. Species risk curves)",
+           "2. Risk Threshold" = "This plot illustrates the risk threshold used to determine if extinction risk is warranted.",
+           "3. Time Threshold" = "This plot highlights the time-based threshold used to classify species as endangered or threatened.",
+           "4. Policy Thresholds" = "This plot combines both risk and time thresholds to support policy decisions regarding species status."
+    )
+  })
+ 
+}
+
+shinyApp(ui = ui, server = server)
+
+
+
+
